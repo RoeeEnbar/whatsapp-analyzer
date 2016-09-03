@@ -47,8 +47,13 @@
     </div>
     <div class="container">
       <form action="/analyze" method="post">
-        <div><textarea name="content" class="input-block-level" rows="3"></textarea></div>
+        <div><textarea name="content" class="input-block-level" rows="10"></textarea></div>
         <div><input type="submit" class="btn btn-large btn-primary" value="Analyze"></div>
+      </form>
+      Or try uploading your conversation
+      <form action="/analyze_uploaded_file" enctype="multipart/form-data" method="post">
+           <input type="file" name="upload_file" size="40">
+           <input type="submit" value="Send">
       </form>
 
       <hr>

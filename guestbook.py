@@ -25,21 +25,23 @@ class MainPage(webapp2.RequestHandler):
 
 
 class Analyzer(webapp2.RequestHandler):
-
     def post(self):
-        content = self.request.get('content')
-        chat_by_name = extract_chat_by_name(content)
-        for name, chat in chat_by_name.iteritems():
-            emojis = find_all_emoticons(chat)
+        try:
+            content = self.request.POST['upload_file'].file.read().decode('utf8')
+        except:
+            content = self.request.get('content')
+
+        chat = Chat(content)
         template = JINJA_ENVIRONMENT.get_template('analysis.html')
         template_values = {
-            'names': chat_by_name.keys()
+            'emojis_by_name': chat.normalized_emoji_counts()
                 }
         self.response.write(template.render(template_values))
 
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/analyze', Analyzer),
+    ('/analyze_uploaded_file', Analyzer),
 ], debug=True)
 
 import emoji
@@ -55,33 +57,42 @@ import datetime
 #plt.style.use('seaborn-darkgrid')
 #
 
-def extract_chat_by_name(txt):
-    names = set(re.findall('(?:^|\n)[\d/, :]+? - (.*?):', txt))
-    return {name: '\n'.join(re.findall(name + r': (.+)\n', txt)) for name in names}
 
-#def process(fn):
-#    txt = codecs.open(fn, encoding='utf8').read()
-#    names = set(re.findall('(?:^|\n)[\d/, :]+? - (.*?):', txt))
-#    print "Conversation with:", ', '.join(names)
-#     dist_msgs_in_a_row(txt)
-#     who_starts_the_conversation(txt)
-#    time_to_respond(txt)
-#     figure()
-#     for name in names:
-#         txt_person = '\n'.join(re.findall(name + r': (.+)\n', txt))
-#         print name
-#         print '-' * len(name)
-#         find_all_emoticons(txt_person)
-#         words(txt_person, name)
+class OneSidedChat:
+    def __init__(self, one_sided_text):
+        self._txt = one_sided_text
+        self._emoji_counter = self._find_all_emoticons()
+    
+    def _find_all_emoticons(self):
+        emoji_unicode = re.compile(u'('
+                            u'\ud83c[\udf00-\udfff]|'
+                            u'\ud83d[\udc00-\ude4f\ude80-\udeff]|'
+                            u'[\u2600-\u26FF\u2700-\u27BF]|'
+                            u'[\u203c-\u3299])', 
+                            re.UNICODE)
+        return Counter(emoji_unicode.findall(self._txt))
 
-def find_all_emoticons(txt):
-    c = Counter(re.findall(u'(?:\u0001[\uf004-\uf9c0])|(?:[\u203c-\u3299])', txt))
+    def normalized_emoji_counter(self, normalize_by):
+        return [(emoji, count, 100.0 * count / normalize_by) for emoji, count in self._emoji_counter.most_common()]
 
-    print 'Total: {} emojis'.format(sum(c.values()))
-    for k, v in c.most_common():
-        print u'{:3}{:>10}{:>40}'.format(v, k, emoji.demojize(k))
-    print
-        
+    def emoji_highest_frequency(self):
+        emoji_name, count = self._emoji_counter.most_common(1)[0]
+        return count
+
+class Chat:
+    def __init__(self, whole_conversation):
+        self._whole_txt = whole_conversation
+        self._chats_by_name = self._extract_chat_by_name(whole_conversation)
+
+    def _extract_chat_by_name(self, txt):
+        names = set(re.findall('(?:^|\n)[\d/, :]+? - (.*?):', txt))
+        return {name: OneSidedChat('\n'.join(re.findall(name + r': (.+)\n', txt))) for name in names}
+
+    def normalized_emoji_counts(self):
+        emoji_highest_frequency = max([one_sided_chat.emoji_highest_frequency() for one_sided_chat in self._chats_by_name.itervalues()])
+        return {name: one_sided_chat.normalized_emoji_counter(emoji_highest_frequency) for name, one_sided_chat in self._chats_by_name.iteritems()}
+
+
 def words(txt, name):
     blob = TextBlob(txt)
     n_words = sum(blob.word_counts.values())
