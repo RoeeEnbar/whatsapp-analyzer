@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 
 from google.appengine.ext import vendor
-vendor.add('env/lib/python2.7/site-packages/')
+try:
+	vendor.add('env/lib/python2.7/site-packages/')
+except ValueError:
+	# windows OS
+	vendor.add('env/Lib/site-packages/')
 
 import os
 import urllib
