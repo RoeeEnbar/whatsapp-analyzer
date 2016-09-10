@@ -22,6 +22,7 @@ JINJA_ENVIRONMENT = jinja2.Environment(
     loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
     extensions=['jinja2.ext.autoescape'],
     autoescape=True)
+JINJA_ENVIRONMENT.globals['json'] = json
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
@@ -39,7 +40,7 @@ class Analyzer(webapp2.RequestHandler):
         chat = Chat(content)
         template = JINJA_ENVIRONMENT.get_template('analysis.html')
         template_values = {
-            'emojis_by_name': chat.normalized_emoji_counts()
+            'emojis_by_name': json.dumps(chat.normalized_emoji_counts())
                 }
         self.response.write(template.render(template_values))
 
@@ -88,6 +89,10 @@ class Chat:
     def __init__(self, whole_conversation):
         self._whole_txt = whole_conversation
         self._chats_by_name = self._extract_chat_by_name(whole_conversation)
+    
+    @property
+    def _names(self):
+        return sorted(self._chats_by_name.keys())
 
     def _extract_chat_by_name(self, txt):
         names = set(re.findall('(?:^|\n)[\d/, :]+? - (.*?):', txt))
@@ -95,7 +100,7 @@ class Chat:
 
     def normalized_emoji_counts(self):
         emoji_highest_frequency = max([one_sided_chat.emoji_highest_frequency() for one_sided_chat in self._chats_by_name.itervalues()])
-        return {name: one_sided_chat.normalized_emoji_counter(emoji_highest_frequency) for name, one_sided_chat in self._chats_by_name.iteritems()}
+        return [(name, self._chats_by_name[name].normalized_emoji_counter(emoji_highest_frequency)) for name in self._names]
 
 
 def words(txt, name):
