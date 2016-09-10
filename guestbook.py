@@ -37,6 +37,7 @@ JINJA_ENVIRONMENT = jinja2.Environment(
     extensions=['jinja2.ext.autoescape'],
     autoescape=True)
 JINJA_ENVIRONMENT.globals['json'] = json
+JINJA_ENVIRONMENT.globals['enumerate'] = enumerate
 
 class MainPage(webapp2.RequestHandler):
     def get(self):

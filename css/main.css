@@ -43,3 +43,8 @@ form {
 .histogram .emoji-line {
     margin-bottom: 5px;
 }
+
+.emoji-histogram-title {
+    font-size: 42px;
+    text-align: center;
+}
