@@ -18,7 +18,7 @@ handlers:
   static_dir: js
 
 - url: /.*
-  script: guestbook.app
+  script: whatsappanalyzer.app
 # [END handlers]
 
 # [START libraries]
