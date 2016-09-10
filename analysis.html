@@ -19,6 +19,7 @@
                 var emojis = e[1];
                 emoji_histogram("#emojis-histogram-" + index, name, emojis, 20);
             });
+            conversation_starters_plot({{conversation_starters|safe}}); 
         });
     </script>
   </head>
@@ -36,11 +37,16 @@
       </div>
     </div>
     <div class="row">
-        {% for i in range(emojis_by_name|length) %} 
+        {% for i in range(json.loads(emojis_by_name)|length) %} 
             <div class="col-md-6">
                 <div id="emojis-histogram-{{i}}" style="height:600px"></div>
             </div>
         {% endfor %}
+    </div>
+    <div class="row">
+        <div class="col-md-6">
+            <div id="conversation_starters" style="height:600px"></div>
+        </div>
     </div>
   </body>
 </html>
