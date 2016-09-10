@@ -58,8 +58,16 @@ function emoji_histogram(html_id, name, emojis, limit) {
     });
 };
 
-function conversation_starters_plot(data) {
-    $("#conversation_starters").highcharts({
+function plot_chat_starters(data) {
+    plot_pie_chart("#conversation_starters", "Who started the chat?", data);
+}
+
+function plot_chat_enders(data) {
+    plot_pie_chart("#conversation_enders", "Who said the last word?", data);
+}
+
+function plot_pie_chart(html_id, title, data) {
+    $(html_id).highcharts({
         chart: {
             plotBackgroundColor: null,
             plotBorderWidth: null,
@@ -67,7 +75,7 @@ function conversation_starters_plot(data) {
             type: 'pie'
         },
         title: {
-            text: 'Who started the conversation?'
+            text: title,
         },
         tooltip: {
             pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>'

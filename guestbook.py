@@ -1,4 +1,16 @@
 #!/usr/bin/env python
+
+#TODO:
+#Emoji tool tip with emoji names, and remove "series 1"
+#time to respond
+#conversation flow
+#unique words
+#distribution of number of words in messages
+#summary: word count, message count, emoji count
+#summary: average length of conversation
+
+
+
 from google.appengine.ext import vendor
 try:
 	vendor.add('env/lib/python2.7/site-packages/')
@@ -40,11 +52,13 @@ class Analyzer(webapp2.RequestHandler):
             content = self.request.get('content')
 
         chat = Chat(content)
+        conversation_starters, conversation_enders = chat.who_starts_and_ends_the_conversation()
         template = JINJA_ENVIRONMENT.get_template('analysis.html')
         template_values = {
             'emojis_by_name': json.dumps(chat.normalized_emoji_counts()),
-            'conversation_starters': json.dumps(chat.conversation_starters())
-                }
+            'conversation_starters': json.dumps(conversation_starters),
+            'conversation_enders': json.dumps(conversation_enders)
+        }
         self.response.write(template.render(template_values))
 
 app = webapp2.WSGIApplication([
@@ -93,16 +107,22 @@ class Chat:
         emoji_highest_frequency = max([one_sided_chat.emoji_highest_frequency() for one_sided_chat in self._chats_by_name.itervalues()])
         return [(name, self._chats_by_name[name].normalized_emoji_counter(emoji_highest_frequency)) for name in self._names]
 
-    def conversation_starters(self):
+    def _new_conversation_started(self, now, before):
         MIN_GAP = datetime.timedelta(hours=8)
-        c = Counter()
+        return now - before > MIN_GAP
+
+    def who_starts_and_ends_the_conversation(self):
+        starts = Counter()
+        ends = Counter()
         times_names = re.findall('(?:^|\n)([\d/, :]+?) - (.*?):', self._whole_txt)
         times_names = [(dateutil.parser.parse(t), n) for t, n in times_names]
         last_time, last_name = times_names[0]
-        for cur_time, name in times_names[1:]:
-            if cur_time - last_time > MIN_GAP:
-                # a new conversation was started by "name"
-                c[name] += 1
+        starts[last_name] += 1
+        for cur_time, cur_name in times_names[1:]:
+            if self._new_conversation_started(cur_time, last_time):
+                starts[cur_name] += 1
+                ends[last_name] += 1
             last_time = cur_time
-        N = sum(c.values())
-        return [{'name': name, 'y': 100.0 * count / N} for name, count in c.iteritems()]
+            last_name = cur_name
+        ends[last_name] += 1
+        return [[{'name': name, 'y': counter[name]} for name in sorted(counter.iterkeys())] for counter in [starts, ends]]
