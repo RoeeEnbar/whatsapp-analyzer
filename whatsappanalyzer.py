@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 #TODO:
+# Verify all emojis are found!
 #Emoji tool tip with emoji names, and remove "series 1"
 #time to respond
 #conversation flow
@@ -21,6 +22,7 @@ except ValueError:
 #from google.appengine.api import users
 #from google.appengine.ext import ndb
 import os
+import sys
 import urllib
 import jinja2
 import webapp2
@@ -83,7 +85,7 @@ class LogSenderHandler(InboundMailHandler):
         key = sha.sha(str(random.random())).hexdigest()
         filename, payload = mail_message.attachments[0]
         decoded = payload.decode()
-        logging.info("Stuff! filename {}, payload type {}, payload {}".format(filename, type(decoded), "XX"))
+	logging.info(u"Stuff! filename {}, payload type {}, payload {}".format(filename, type(decoded), decoded[:1000]))
         stored = StoredAnalysis(key=key, html=analyze_chat(decoded))
         stored.put()
         body = """Hi!
@@ -93,13 +95,14 @@ class LogSenderHandler(InboundMailHandler):
         if the link does not work, copy paste the following line into your browser:
         %(link)s
 
-        * The analysis is automatically deleted after 24 hours.""" % {'link': 'http://localhost:9000/stored/%s' % key}
+	* The analysis is automatically deleted after 24 hours.""" % {'link': 'https://whatsapp-analyzer-142211.appspot.com/stored/%s' % key}
+	logging.info("Mail body - %s", body)
 
-        mail.send_mail(
-                sender="no-reply@whatsapp-analyzer-142211.appspotmail.com",
-                to=mail_message.sender,
-                subject="Your chat analysis is ready",
-                body=body)
+#        mail.send_mail(
+#                sender="no-reply@whatsapp-analyzer-142211.appspotmail.com",
+#                to=mail_message.sender,
+#                subject="Your chat analysis is ready",
+#                body=body)
 
 app = webapp2.WSGIApplication([
     ('/', MainPage),
@@ -115,12 +118,15 @@ class OneSidedChat:
         self._emoji_counter = self._find_all_emoticons()
     
     def _find_all_emoticons(self):
-        emoji_unicode = re.compile(u'('
+        if sys.maxunicode == 65535:
+            emoji_unicode = re.compile(u'('
                             u'\ud83c[\udf00-\udfff]|'
                             u'\ud83d[\udc00-\ude4f\ude80-\udeff]|'
                             u'[\u2600-\u26FF\u2700-\u27BF]|'
                             u'[\u203c-\u3299])', 
                             re.UNICODE)
+	else:
+	    emoji_unicode = re.compile(u'[\U0001f004-\U0001f9c0|\u203c-\u3299|\u2600-\u27BF]', re.UNICODE)
         return Counter(emoji_unicode.findall(self._txt))
 
     def normalized_emoji_counter(self, normalize_by):
