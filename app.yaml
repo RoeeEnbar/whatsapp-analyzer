@@ -3,6 +3,9 @@ api_version: 1
 threadsafe: true
 
 # [START handlers]
+inbound_services:
+- mail
+
 handlers:
 - url: /favicon\.ico
   static_files: favicon.ico
@@ -19,7 +22,6 @@ handlers:
 
 - url: /.*
   script: whatsappanalyzer.app
-# [END handlers]
 
 # [START libraries]
 libraries:

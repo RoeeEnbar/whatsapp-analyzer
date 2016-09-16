@@ -28,9 +28,14 @@ import logging
 import json
 import emoji
 import re
+import sha
+import random
 from collections import Counter, defaultdict
 import dateutil.parser
 import datetime
+from google.appengine.ext.webapp.mail_handlers import InboundMailHandler
+from google.appengine.api import mail
+from google.appengine.ext import ndb
 
 JINJA_ENVIRONMENT = jinja2.Environment(
     loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
@@ -39,11 +44,25 @@ JINJA_ENVIRONMENT = jinja2.Environment(
 JINJA_ENVIRONMENT.globals['json'] = json
 JINJA_ENVIRONMENT.globals['enumerate'] = enumerate
 
+class StoredAnalysis(ndb.Model):
+    key = ndb.StringProperty(indexed=True)
+    html = ndb.StringProperty(indexed=False)
+
 class MainPage(webapp2.RequestHandler):
     def get(self):
         template = JINJA_ENVIRONMENT.get_template('index.html')
         self.response.write(template.render())
 
+def analyze_chat(content):
+    chat = Chat(content)
+    conversation_starters, conversation_enders = chat.who_starts_and_ends_the_conversation()
+    template = JINJA_ENVIRONMENT.get_template('analysis.html')
+    template_values = {
+        'emojis_by_name': json.dumps(chat.normalized_emoji_counts()),
+        'conversation_starters': json.dumps(conversation_starters),
+        'conversation_enders': json.dumps(conversation_enders)
+    }
+    return template.render(template_values)
 
 class Analyzer(webapp2.RequestHandler):
     def post(self):
@@ -51,24 +70,44 @@ class Analyzer(webapp2.RequestHandler):
             content = self.request.POST['upload_file'].file.read().decode('utf8')
         except:
             content = self.request.get('content')
+        self.response.write(analyze_chat(content))
 
-        chat = Chat(content)
-        conversation_starters, conversation_enders = chat.who_starts_and_ends_the_conversation()
-        template = JINJA_ENVIRONMENT.get_template('analysis.html')
-        template_values = {
-            'emojis_by_name': json.dumps(chat.normalized_emoji_counts()),
-            'conversation_starters': json.dumps(conversation_starters),
-            'conversation_enders': json.dumps(conversation_enders)
-        }
-        self.response.write(template.render(template_values))
+class ViewStoredAnalysis(webapp2.RequestHandler):
+    def get(self, key):
+        html = StoredAnalysis.query(StoredAnalysis.key==key).get().html
+        self.response.write(html)
+
+class LogSenderHandler(InboundMailHandler):
+    def receive(self, mail_message):
+        logging.info("Received a message from: " + mail_message.sender)
+        key = sha.sha(str(random.random())).hexdigest()
+        filename, payload = mail_message.attachments[0]
+        decoded = payload.decode()
+        logging.info("Stuff! filename {}, payload type {}, payload {}".format(filename, type(decoded), "XX"))
+        stored = StoredAnalysis(key=key, html=analyze_chat(decoded))
+        stored.put()
+        body = """Hi!
+        Your chat analysis from Whatsapp Analyzer is ready.
+        <a href="%(link)s">Click here to view</a>
+        
+        if the link does not work, copy paste the following line into your browser:
+        %(link)s
+
+        * The analysis is automatically deleted after 24 hours.""" % {'link': 'http://localhost:9000/stored/%s' % key}
+
+        mail.send_mail(
+                sender="no-reply@whatsapp-analyzer-142211.appspotmail.com",
+                to=mail_message.sender,
+                subject="Your chat analysis is ready",
+                body=body)
 
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/analyze', Analyzer),
     ('/analyze_uploaded_file', Analyzer),
+    ('/stored/(.+)', ViewStoredAnalysis),
+    LogSenderHandler.mapping(),
 ], debug=True)
-
-
 
 class OneSidedChat:
     def __init__(self, one_sided_text):
